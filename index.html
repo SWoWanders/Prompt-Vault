@@ -1,0 +1,747 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#121016">
+<title>Prompt Vault</title>
+<style>
+  :root{
+    --bg:#121016; --panel:#1b1821; --panel2:#231f2b; --line:#332d3d; --text:#efeaf5; --dim:#9a91a8;
+    --accent:#c792ff; --accent2:#7ee0c3; --gold:#ffcf5c; --danger:#ff7a7a;
+    --f-Subject:#7ec8ff; --f-Style:#c792ff; --f-Mood:#ffb36b; --f-Shot:#7ee0c3; --f-Platform:#ff8fb8; --f-Aspect:#d6d06b; --f-Tag:#b8b0c6;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{margin:0;background:var(--bg);color:var(--text);font:15px/1.45 system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
+  .wrap{max-width:900px;margin:0 auto;padding:0 12px 90px}
+  header{position:sticky;top:0;z-index:20;background:linear-gradient(var(--bg) 80%,#12101600);padding:12px 0 8px}
+  .top{display:flex;align-items:center;gap:10px}
+  h1{font-size:20px;margin:0;flex:1;letter-spacing:.3px}
+  h1 span{color:var(--accent)}
+  .tabs{display:flex;gap:6px;margin-top:10px}
+  .tab{flex:1;padding:10px;border-radius:10px;border:1px solid var(--line);background:var(--panel);color:var(--dim);font-weight:700;font-size:15px}
+  .tab.on{background:var(--accent);color:#1d0f2b;border-color:var(--accent)}
+  button{font:inherit;cursor:pointer;color:var(--text)}
+  .btn{background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:9px 13px;font-weight:600;font-size:14px}
+  .btn:active{transform:scale(.97)}
+  .btn.primary{background:var(--accent);color:#1d0f2b;border-color:var(--accent)}
+  .btn.teal{background:var(--accent2);color:#06241c;border-color:var(--accent2)}
+  .btn.danger{color:var(--danger)}
+  .btn.icon{padding:8px 11px}
+  .btn:disabled{opacity:.4}
+  textarea,input[type=text],input[type=search],select{width:100%;background:#0e0c12;color:var(--text);border:1px solid var(--line);border-radius:10px;padding:10px 12px;font:inherit;font-size:16px}
+  textarea{min-height:150px;resize:vertical}
+  .panel{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:12px;margin-bottom:12px}
+  .row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+  .grow{flex:1}
+  .dim{color:var(--dim);font-size:13px}
+  .hide{display:none!important}
+  label.chk{display:flex;gap:8px;align-items:center;font-size:14px;color:var(--dim)}
+  label.chk input{width:18px;height:18px;accent-color:var(--accent)}
+
+  /* chips */
+  .chips{display:flex;flex-wrap:wrap;gap:5px}
+  .chip{font-size:12px;padding:3px 9px;border-radius:999px;border:1px solid color-mix(in srgb,var(--c) 55%,transparent);
+    color:var(--c);background:color-mix(in srgb,var(--c) 12%,transparent);white-space:nowrap;--c:var(--f-Tag)}
+  .chip.off{opacity:.35;text-decoration:line-through}
+  .chip b{font-weight:600;opacity:.7;margin-right:3px}
+  button.chip{cursor:pointer}
+
+  /* filters */
+  .filters{margin-top:8px}
+  .facet{display:flex;gap:6px;overflow-x:auto;padding:4px 0;scrollbar-width:none}
+  .facet::-webkit-scrollbar{display:none}
+  .facet .lbl{font-size:11px;text-transform:uppercase;letter-spacing:.7px;color:var(--dim);align-self:center;min-width:62px}
+  .fchip{flex:none;font-size:13px;padding:5px 11px;border-radius:999px;border:1px solid var(--line);background:var(--panel);color:var(--text)}
+  .fchip.on{background:var(--c);color:#111;border-color:var(--c);font-weight:700}
+  .fchip i{font-style:normal;opacity:.6;margin-left:4px;font-size:11px}
+
+  /* cards */
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:12px;margin-bottom:10px;display:flex;gap:12px}
+  .card .thumb{width:84px;height:84px;flex:none;border-radius:10px;object-fit:cover;background:#000}
+  .card .body{flex:1;min-width:0}
+  .card .text{white-space:pre-wrap;word-break:break-word;display:-webkit-box;-webkit-line-clamp:4;-webkit-box-orient:vertical;overflow:hidden;cursor:pointer}
+  .card.open .text{-webkit-line-clamp:unset;display:block}
+  .card .notes{font-size:13px;color:var(--dim);margin-top:4px;font-style:italic}
+  .card .chips{margin:8px 0}
+  .card .acts{display:flex;gap:6px;align-items:center}
+  .star{background:none;border:none;font-size:22px;color:var(--dim);padding:2px 6px}
+  .star.on{color:var(--gold)}
+  .copybtn{flex:1;max-width:160px}
+  .copybtn.done{background:var(--accent2);border-color:var(--accent2);color:#06241c}
+  .meta{font-size:11px;color:var(--dim);margin-left:auto;text-align:right}
+
+  /* add preview */
+  .pv{border:1px solid var(--line);border-radius:12px;padding:10px;margin-top:10px;background:var(--panel2)}
+  .pv .ptext{white-space:pre-wrap;word-break:break-word;font-size:14px;max-height:120px;overflow:auto}
+  .dupe{color:var(--gold);font-size:13px;margin-top:6px}
+  .pvimg{width:64px;height:64px;object-fit:cover;border-radius:8px}
+
+  .empty{text-align:center;color:var(--dim);padding:40px 10px}
+
+  /* modal */
+  .modal{position:fixed;inset:0;background:#000b;z-index:50;display:flex;align-items:flex-end;justify-content:center}
+  .sheet{background:var(--panel);border:1px solid var(--line);border-radius:18px 18px 0 0;width:100%;max-width:700px;max-height:92vh;overflow:auto;padding:16px 14px 28px}
+  @media(min-width:700px){.modal{align-items:center}.sheet{border-radius:18px}}
+  .sheet h2{margin:0 0 10px;font-size:18px}
+  .sheet h3{font-size:12px;text-transform:uppercase;letter-spacing:.7px;color:var(--dim);margin:14px 0 6px}
+  .menu button{display:block;width:100%;text-align:left;margin-bottom:8px}
+
+  #toast{position:fixed;left:50%;bottom:22px;transform:translateX(-50%) translateY(30px);opacity:0;z-index:99;
+    background:#2c2637;border:1px solid var(--accent);color:var(--text);padding:10px 16px;border-radius:12px;font-size:14px;
+    transition:.25s;pointer-events:none;max-width:90vw;text-align:center}
+  #toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="top">
+      <h1>Prompt <span>Vault</span></h1>
+      <button class="btn icon" id="menuBtn" aria-label="Menu">☰</button>
+    </div>
+    <div class="tabs">
+      <button class="tab on" data-tab="lib">Library <span id="libCount"></span></button>
+      <button class="tab" data-tab="add">＋ Add prompts</button>
+    </div>
+  </header>
+
+  <!-- LIBRARY -->
+  <section id="lib">
+    <div class="row" style="margin:6px 0">
+      <input type="search" id="q" class="grow" placeholder="Search prompts, tags, notes…" style="flex:1;min-width:0">
+      <button class="btn icon" id="favOnly" title="Favourites only">☆</button>
+    </div>
+    <div class="row">
+      <select id="sort" style="flex:1">
+        <option value="new">Newest first</option>
+        <option value="old">Oldest first</option>
+        <option value="copies">Most copied</option>
+        <option value="used">Recently copied</option>
+        <option value="az">A → Z</option>
+      </select>
+      <button class="btn" id="filterToggle">Filters ▾</button>
+    </div>
+    <div class="filters hide" id="filters"></div>
+    <div class="row" style="margin:8px 0">
+      <div class="dim grow" id="resultInfo"></div>
+      <button class="btn hide" id="clearFilters">Clear filters</button>
+    </div>
+    <div id="list"></div>
+  </section>
+
+  <!-- ADD -->
+  <section id="add" class="hide">
+    <div class="panel">
+      <textarea id="paste" placeholder="Paste one or more prompts here…&#10;&#10;Put a blank line between prompts to add several at once."></textarea>
+      <div class="row" style="margin-top:8px">
+        <label class="chk grow"><input type="checkbox" id="splitMode" checked> Blank line = new prompt</label>
+        <button class="btn" id="pasteClip">📋 Paste</button>
+        <button class="btn primary" id="analyze">Analyze</button>
+      </div>
+      <div class="dim" style="margin-top:6px">Categories are suggested from keywords. Tap a chip to remove it before saving.</div>
+    </div>
+    <div id="preview"></div>
+    <div class="row hide" id="saveRow" style="justify-content:flex-end;margin-top:10px">
+      <button class="btn" id="cancelAdd">Discard</button>
+      <button class="btn teal" id="saveAll">Save all</button>
+    </div>
+  </section>
+</div>
+
+<input type="file" id="imgPick" accept="image/*" class="hide">
+<input type="file" id="importPick" accept=".json,application/json" class="hide">
+<div id="toast"></div>
+<div id="modalRoot"></div>
+
+<script>
+(() => {
+'use strict';
+const $ = id => document.getElementById(id);
+const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+// ================= CATEGORY RULES (local keyword matching, no AI) =================
+const FACETS = ['Subject','Style','Mood','Shot','Platform','Aspect','Tag'];
+const FACET_LABEL = {Subject:'Subject',Style:'Style',Mood:'Mood & Light',Shot:'Camera',Platform:'Platform',Aspect:'Aspect',Tag:'My tags'};
+const RULES = {
+  Subject: {
+    'People & Portraits': ['portrait','woman','women','man','men','girl','boy','person','people','face','child','kid','elderly','old man','old woman','model','headshot','selfie','couple','family','warrior','knight','queen','king','princess','prince','soldier','samurai','geisha','dancer','musician','character'],
+    'Animals': ['cat','kitten','dog','puppy','bird','horse','fox','wolf','owl','lion','tiger','bear','deer','rabbit','bunny','fish','whale','octopus','animal','animals','butterfly','insect','frog','elephant','monkey','raccoon','squirrel','crow','raven'],
+    'Landscapes & Nature': ['landscape','mountain','mountains','forest','woods','ocean','sea','lake','river','desert','fields','wheat field','flower field','grassy field','valley','waterfall','beach','meadow','canyon','island','glacier','jungle','nature','hills','countryside','garden','flowers','flower','tree','trees','cliff','coast','sky','clouds'],
+    'City & Architecture': ['city','cityscape','street','streets','building','buildings','architecture','skyline','interior','room','house','cathedral','church','bridge','alley','urban','cafe','café','tower','library','train station','subway','downtown','apartment','shop','storefront','ruins','temple'],
+    'Food & Drink': ['food','dish','meal','cake','coffee','tea','cocktail','wine','dessert','bread','pizza','burger','sushi','fruit','breakfast','restaurant','pastry','chocolate','soup'],
+    'Vehicles': ['car','cars','truck','motorcycle','bike','bicycle','train','airplane','plane','ship','boat','sailboat','bus','tram','vehicle','race car','van'],
+    'Fantasy': ['fantasy','dragon','wizard','witch','elf','elves','fairy','faerie','magic','magical','mythical','enchanted','sorcerer','unicorn','goblin','troll','castle','spell','mermaid','phoenix','griffin','dungeon','lich','necromancer'],
+    'Sci-Fi & Space': ['sci-fi','scifi','science fiction','spaceship','starship','robot','robots','cyberpunk','futuristic','alien','android','cyborg','mech','space','planet','galaxy','nebula','astronaut','space station','dystopian','hologram','spacecraft','moon','stars','cosmic'],
+    'Horror': ['horror','creepy','monster','zombie','ghost','haunted','skull','skeleton','demon','eldritch','lovecraftian','abomination','blood','vampire'],
+    'Objects & Products': ['product','bottle','perfume','sneaker','sneakers','watch','still life','jewelry','ring','packaging','mockup','logo','poster','lamp','chair','furniture','toy','book cover','vase'],
+    'Abstract & Patterns': ['abstract','pattern','fractal','geometric','texture','seamless','tessellation','kaleidoscope','shapes','gradient','swirl','mandala','wallpaper'],
+  },
+  Style: {
+    'Photorealistic': ['photo','photograph','photography','photorealistic','realistic','hyperrealistic','hyper-realistic','35mm','50mm','85mm','dslr','canon','nikon','sony','leica','fujifilm','kodak','portra','f/1.4','f/1.8','f/2.8','bokeh','raw photo','8k','4k','film grain','shot on'],
+    'Cinematic': ['cinematic','film still','movie still','movie','anamorphic','blockbuster','imax','wes anderson','kubrick','color grading','letterbox'],
+    'Anime & Manga': ['anime','manga','studio ghibli','ghibli','makoto shinkai','cel shaded','cel-shaded','chibi','niji','kawaii'],
+    'Illustration & Cartoon': ['illustration','illustrated','comic','comic book','cartoon','children\'s book','storybook','vector','flat design','flat illustration','graphic novel','sticker','pixar','disney','editorial illustration','risograph'],
+    'Painting': ['oil painting','painting','painted','watercolor','watercolour','acrylic','gouache','impressionist','impressionism','brushstrokes','brush strokes','canvas','fresco','van gogh','monet','rembrandt','renaissance','baroque','tempera','plein air'],
+    'Drawing & Print': ['sketch','pencil','charcoal','ink','line art','lineart','linocut','woodcut','etching','engraving','pen and ink','crosshatch','crosshatching','blueprint','technical drawing','stippling'],
+    '3D & CGI': ['3d','3d render','render','rendered','octane','unreal engine','blender','cgi','isometric','clay','claymation','low poly','voxel','c4d','cinema 4d','ray tracing','subsurface'],
+    'Pixel & Retro': ['pixel art','pixel','8-bit','8 bit','16-bit','16 bit','retro','vaporwave','synthwave','80s','1980s','70s','1970s','90s','vintage','polaroid','vhs','crt','c64','commodore','sega','nes'],
+    'Concept & Digital Art': ['concept art','matte painting','artstation','digital art','digital painting','trending on artstation','greg rutkowski','splash art','key art','character design'],
+    'Surreal & Dreamlike': ['surreal','surrealism','dreamlike','dali','magritte','psychedelic','trippy','otherworldly','impossible'],
+    'Minimal & Graphic': ['minimal','minimalist','minimalism','clean','simple background','negative space','bauhaus','swiss design','line drawing','monoline'],
+  },
+  Mood: {
+    'Golden Hour & Sunset': ['golden hour','sunset','sunrise','dusk','dawn','warm light','magic hour'],
+    'Night': ['night','nighttime','midnight','moonlight','moonlit','starry','stars','city lights'],
+    'Dark & Moody': ['dark','moody','gloomy','noir','eerie','ominous','gothic','melancholy','melancholic','brooding','shadowy','grim','bleak','foreboding'],
+    'Bright & Cheerful': ['bright','cheerful','happy','vibrant','colorful','colourful','playful','whimsical','cute','joyful','sunny','pastel','candy'],
+    'Neon & Glow': ['neon','glowing','glow','bioluminescent','fluorescent','led','luminous','light trails'],
+    'Dramatic Lighting': ['dramatic lighting','dramatic','rim light','rim lighting','chiaroscuro','volumetric','volumetric lighting','god rays','backlit','backlighting','high contrast','spotlight','studio lighting','rembrandt lighting'],
+    'Soft & Serene': ['soft','soft light','soft lighting','serene','calm','peaceful','tranquil','dreamy','misty','mist','foggy','fog','hazy','ethereal','gentle','cozy','cosy'],
+    'Weather & Seasons': ['rain','rainy','snow','snowy','storm','stormy','autumn','fall','winter','spring','summer','thunder','lightning'],
+    'Monochrome': ['black and white','b&w','monochrome','monochromatic','greyscale','grayscale','sepia','duotone'],
+  },
+  Shot: {
+    'Close-up & Macro': ['close-up','closeup','close up','macro','extreme close-up','detail shot','portrait shot','headshot'],
+    'Wide & Panoramic': ['wide shot','wide angle','wide-angle','panoramic','panorama','establishing shot','vista','ultra wide','fisheye','full body','full-body'],
+    'Aerial & Top-down': ['aerial','drone','bird\'s eye','birds eye','top-down','top down','overhead','flat lay','flatlay','satellite'],
+    'Low Angle': ['low angle','low-angle','worm\'s eye','from below','heroic angle'],
+    'Depth of Field': ['bokeh','shallow depth of field','depth of field','tilt-shift','tilt shift','blurred background'],
+    'Symmetry & Centered': ['symmetry','symmetrical','centered','centred','front view','orthographic'],
+  },
+  Platform: {
+    'Midjourney': ['--ar','--v','--style','--stylize','--niji','--chaos','--q','--sref','--cref','--weird','--tile','::'],
+    'Stable Diffusion': ['negative prompt','cfg','steps:','sampler','lora','<lora','masterpiece, best quality','best quality','((','embedding:'],
+  },
+};
+
+// Pre-compile regexes once
+const COMPILED = {};
+for (const f in RULES) {
+  COMPILED[f] = Object.entries(RULES[f]).map(([cat, kws]) => {
+    const parts = kws.map(k => {
+      const e = k.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const startW = /^\w/.test(k) ? '\\b' : '';
+      const endW = /\w$/.test(k) ? '\\b' : '';
+      return startW + e + endW;
+    });
+    return [cat, new RegExp(parts.join('|'), 'i')];
+  });
+}
+
+function suggest(text) {
+  const out = [];
+  for (const f in COMPILED) for (const [cat, re] of COMPILED[f]) if (re.test(text)) out.push(f + ':' + cat);
+  const ar = text.match(/--(?:ar|aspect)\s+(\d+\s*:\s*\d+)/i);
+  if (ar) out.push('Aspect:' + ar[1].replace(/\s/g, ''));
+  if (!out.some(c => c.startsWith('Subject:'))) out.push('Subject:Uncategorized');
+  return out;
+}
+
+function makeTitle(text) {
+  const clean = text.replace(/--\w+\s+\S+/g, '').replace(/[\(\)\[\]{}:]+/g, ' ').replace(/\s+/g, ' ').trim();
+  const words = clean.split(' ').slice(0, 8).join(' ');
+  return words.length < clean.length ? words.replace(/[,.;]+$/, '') + '…' : words;
+}
+const norm = t => t.toLowerCase().replace(/\s+/g, ' ').trim();
+
+// ================= STORAGE (IndexedDB) =================
+const DB_NAME = 'prompt-vault', STORE = 'prompts';
+let db;
+function openDB() {
+  return new Promise((res, rej) => {
+    const r = indexedDB.open(DB_NAME, 1);
+    r.onupgradeneeded = () => r.result.createObjectStore(STORE, { keyPath: 'id' });
+    r.onsuccess = () => res(r.result);
+    r.onerror = () => rej(r.error);
+  });
+}
+function tx(mode, fn) {
+  return new Promise((res, rej) => {
+    const t = db.transaction(STORE, mode);
+    const s = t.objectStore(STORE);
+    const out = fn(s);
+    t.oncomplete = () => res(out && out.result !== undefined ? out.result : out);
+    t.onerror = () => rej(t.error);
+    t.onabort = () => rej(t.error || new Error('Transaction aborted'));
+  });
+}
+const dbAll = () => new Promise((res, rej) => {
+  const r = db.transaction(STORE).objectStore(STORE).getAll();
+  r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error);
+});
+const dbPut = items => tx('readwrite', s => { for (const i of [].concat(items)) s.put(i); });
+const dbDel = id => tx('readwrite', s => { s.delete(id); });
+const dbClear = () => tx('readwrite', s => { s.clear(); });
+
+// ================= STATE =================
+let items = [];
+let pending = [];          // prompts being added
+const filters = new Set(); // "Facet:Value"
+let favOnly = false;
+const thumbURLs = new Map();
+const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+
+function thumb(it) {
+  if (!it.image) return null;
+  if (!thumbURLs.has(it.id)) thumbURLs.set(it.id, URL.createObjectURL(it.image));
+  return thumbURLs.get(it.id);
+}
+function dropThumb(id) { if (thumbURLs.has(id)) { URL.revokeObjectURL(thumbURLs.get(id)); thumbURLs.delete(id); } }
+
+// ================= TOAST =================
+let toastT;
+function toast(msg) {
+  const t = $('toast'); t.textContent = msg; t.classList.add('show');
+  clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove('show'), 2200);
+}
+
+// ================= TABS =================
+document.querySelectorAll('.tab').forEach(b => b.addEventListener('click', () => showTab(b.dataset.tab)));
+function showTab(name) {
+  document.querySelectorAll('.tab').forEach(b => b.classList.toggle('on', b.dataset.tab === name));
+  $('lib').classList.toggle('hide', name !== 'lib');
+  $('add').classList.toggle('hide', name !== 'add');
+  if (name === 'add') setTimeout(() => $('paste').focus(), 50);
+}
+
+// ================= CHIP HTML =================
+function chipHTML(c, extra = '', tag = 'span') {
+  const [f, v] = splitCat(c);
+  return `<${tag} class="chip ${extra}" style="--c:var(--f-${f})" data-cat="${esc(c)}">${esc(v)}</${tag}>`;
+}
+function splitCat(c) { const i = c.indexOf(':'); return [c.slice(0, i), c.slice(i + 1)]; }
+function sortCats(cats) {
+  return [...cats].sort((a, b) => FACETS.indexOf(splitCat(a)[0]) - FACETS.indexOf(splitCat(b)[0]) || a.localeCompare(b));
+}
+
+// ================= ADD FLOW =================
+$('pasteClip').addEventListener('click', async () => {
+  try {
+    const t = await navigator.clipboard.readText();
+    if (!t.trim()) return toast('Clipboard is empty');
+    $('paste').value = ($('paste').value.trim() ? $('paste').value.trim() + '\n\n' : '') + t.trim();
+    toast('Pasted from clipboard');
+  } catch { toast('Clipboard access blocked — long-press the box and choose Paste'); }
+});
+
+$('analyze').addEventListener('click', () => {
+  const raw = $('paste').value.trim();
+  if (!raw) return toast('Paste a prompt first');
+  const chunks = $('splitMode').checked ? raw.split(/\n\s*\n+/) : [raw];
+  const existing = new Set(items.map(i => norm(i.text)));
+  const seen = new Set();
+  pending = chunks.map(c => c.trim()).filter(Boolean).map(text => {
+    const n = norm(text);
+    const dupe = existing.has(n) ? 'Already in your vault' : seen.has(n) ? 'Duplicate in this batch' : '';
+    seen.add(n);
+    return { id: uid(), text, title: makeTitle(text), cats: suggest(text), off: new Set(), tags: [], notes: '', image: null, dupe, skip: !!dupe };
+  });
+  renderPending();
+  toast(`Found ${pending.length} prompt${pending.length > 1 ? 's' : ''}`);
+});
+
+function renderPending() {
+  const box = $('preview');
+  $('saveRow').classList.toggle('hide', !pending.length);
+  if (!pending.length) { box.innerHTML = ''; return; }
+  box.innerHTML = pending.map((p, i) => `
+    <div class="pv" data-i="${i}">
+      <div class="row" style="align-items:flex-start">
+        <div class="grow ptext">${esc(p.text)}</div>
+        ${p.image ? `<img class="pvimg" src="${p._url}">` : ''}
+      </div>
+      <div class="chips" style="margin-top:8px">${sortCats(p.cats).map(c => chipHTML(c, p.off.has(c) ? 'off' : '', 'button')).join('')}
+        ${p.tags.map(t => chipHTML('Tag:' + t, '', 'button')).join('')}</div>
+      ${p.dupe ? `<div class="dupe">⚠ ${p.dupe}</div>` : ''}
+      <div class="row" style="margin-top:8px">
+        <input type="text" class="grow tagIn" placeholder="Add tags (comma separated)" style="flex:1;min-width:0;font-size:14px;padding:7px 10px">
+        <button class="btn icon imgBtn" title="Attach example image">🖼</button>
+        <label class="chk"><input type="checkbox" class="keep" ${p.skip ? '' : 'checked'}> Save</label>
+      </div>
+    </div>`).join('');
+
+  box.querySelectorAll('.pv').forEach(el => {
+    const p = pending[+el.dataset.i];
+    el.querySelectorAll('button.chip').forEach(ch => ch.addEventListener('click', () => {
+      const c = ch.dataset.cat;
+      if (c.startsWith('Tag:')) { p.tags = p.tags.filter(t => 'Tag:' + t !== c); toast('Tag removed'); }
+      else if (p.off.has(c)) { p.off.delete(c); toast('Category kept'); }
+      else { p.off.add(c); toast('Category removed'); }
+      renderPending();
+    }));
+    const tin = el.querySelector('.tagIn');
+    const addTags = () => {
+      const t = tin.value.split(',').map(s => s.trim()).filter(Boolean);
+      if (!t.length) return;
+      p.tags = [...new Set([...p.tags, ...t])]; toast(`Added ${t.length} tag${t.length > 1 ? 's' : ''}`); renderPending();
+    };
+    tin.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); addTags(); } });
+    tin.addEventListener('blur', addTags);
+    el.querySelector('.keep').addEventListener('change', e => { p.skip = !e.target.checked; toast(p.skip ? 'Will skip this one' : 'Will save this one'); });
+    el.querySelector('.imgBtn').addEventListener('click', () => pickImage(async blob => {
+      p.image = blob; if (p._url) URL.revokeObjectURL(p._url); p._url = URL.createObjectURL(blob);
+      renderPending(); toast('Image attached');
+    }));
+  });
+}
+
+$('cancelAdd').addEventListener('click', () => { pending = []; renderPending(); toast('Discarded'); });
+$('saveAll').addEventListener('click', async () => {
+  const keep = pending.filter(p => !p.skip);
+  if (!keep.length) return toast('Nothing selected to save');
+  const now = Date.now();
+  const recs = keep.map((p, k) => ({
+    id: p.id, text: p.text, title: p.title,
+    cats: p.cats.filter(c => !p.off.has(c)), tags: p.tags, notes: '', image: p.image,
+    fav: false, created: now + k, updated: now + k, copies: 0, lastCopied: 0
+  }));
+  try {
+    await dbPut(recs);
+    items.push(...recs);
+    pending.forEach(p => p._url && URL.revokeObjectURL(p._url));
+    pending = []; $('paste').value = ''; renderPending();
+    renderLib(); showTab('lib');
+    toast(`Saved ${recs.length} prompt${recs.length > 1 ? 's' : ''} ✓`);
+  } catch (e) { toast('Save failed: ' + e.message); }
+});
+
+// ================= IMAGE PICK (downscaled to keep storage small) =================
+let imgCb = null;
+function pickImage(cb) { imgCb = cb; $('imgPick').value = ''; $('imgPick').click(); }
+$('imgPick').addEventListener('change', async () => {
+  const f = $('imgPick').files[0]; if (!f || !imgCb) return;
+  try {
+    const bmp = await createImageBitmap(f);
+    const max = 640, sc = Math.min(1, max / Math.max(bmp.width, bmp.height));
+    const c = document.createElement('canvas');
+    c.width = Math.round(bmp.width * sc); c.height = Math.round(bmp.height * sc);
+    c.getContext('2d').drawImage(bmp, 0, 0, c.width, c.height);
+    const blob = await new Promise(r => c.toBlob(r, 'image/jpeg', .85));
+    imgCb(blob);
+  } catch { toast('Couldn’t read that image'); }
+});
+
+// ================= LIBRARY =================
+$('q').addEventListener('input', debounce(renderLib, 150));
+$('sort').addEventListener('change', () => { renderLib(); toast('Sorted: ' + $('sort').selectedOptions[0].text); });
+$('favOnly').addEventListener('click', () => {
+  favOnly = !favOnly; $('favOnly').textContent = favOnly ? '★' : '☆';
+  $('favOnly').style.color = favOnly ? 'var(--gold)' : '';
+  renderLib(); toast(favOnly ? 'Showing favourites' : 'Showing all');
+});
+$('filterToggle').addEventListener('click', () => {
+  const f = $('filters'); f.classList.toggle('hide');
+  $('filterToggle').textContent = f.classList.contains('hide') ? `Filters${filters.size ? ' (' + filters.size + ')' : ''} ▾` : 'Filters ▴';
+});
+$('clearFilters').addEventListener('click', () => {
+  filters.clear(); favOnly = false; $('favOnly').textContent = '☆'; $('favOnly').style.color = ''; $('q').value = '';
+  renderLib(); toast('Filters cleared');
+});
+
+function allCats(it) { return [...it.cats, ...it.tags.map(t => 'Tag:' + t)]; }
+
+function matches(it, ignoreFacet) {
+  if (favOnly && !it.fav) return false;
+  const q = norm($('q').value);
+  if (q) {
+    const hay = norm(it.text + ' ' + it.tags.join(' ') + ' ' + (it.notes || '') + ' ' + it.cats.join(' '));
+    if (!q.split(' ').every(w => hay.includes(w))) return false;
+  }
+  // OR within facet, AND across facets
+  const byFacet = {};
+  for (const c of filters) { const f = splitCat(c)[0]; if (f === ignoreFacet) continue; (byFacet[f] ||= []).push(c); }
+  const mine = new Set(allCats(it));
+  return Object.values(byFacet).every(list => list.some(c => mine.has(c)));
+}
+
+function renderFilters() {
+  const html = [];
+  for (const f of FACETS) {
+    const counts = {};
+    for (const it of items) if (matches(it, f)) for (const c of allCats(it)) if (c.startsWith(f + ':')) counts[c] = (counts[c] || 0) + 1;
+    for (const c of filters) if (c.startsWith(f + ':') && !counts[c]) counts[c] = 0;
+    const keys = Object.keys(counts).sort((a, b) => counts[b] - counts[a] || a.localeCompare(b));
+    if (!keys.length) continue;
+    html.push(`<div class="facet"><span class="lbl">${FACET_LABEL[f]}</span>${keys.map(c =>
+      `<button class="fchip ${filters.has(c) ? 'on' : ''}" style="--c:var(--f-${f})" data-cat="${esc(c)}">${esc(splitCat(c)[1])}<i>${counts[c]}</i></button>`).join('')}</div>`);
+  }
+  $('filters').innerHTML = html.join('') || '<div class="dim">Add some prompts to see categories here.</div>';
+  $('filters').querySelectorAll('.fchip').forEach(b => b.addEventListener('click', () => {
+    const c = b.dataset.cat;
+    filters.has(c) ? filters.delete(c) : filters.add(c);
+    renderLib(); toast((filters.has(c) ? 'Filter on: ' : 'Filter off: ') + splitCat(c)[1]);
+  }));
+}
+
+function renderLib() {
+  $('libCount').textContent = items.length ? `(${items.length})` : '';
+  renderFilters();
+  if (!$('filters').classList.contains('hide')) $('filterToggle').textContent = 'Filters ▴';
+  else $('filterToggle').textContent = `Filters${filters.size ? ' (' + filters.size + ')' : ''} ▾`;
+
+  const s = $('sort').value;
+  const list = items.filter(it => matches(it)).sort((a, b) =>
+    s === 'old' ? a.created - b.created :
+    s === 'copies' ? b.copies - a.copies || b.created - a.created :
+    s === 'used' ? (b.lastCopied || 0) - (a.lastCopied || 0) :
+    s === 'az' ? a.text.localeCompare(b.text) : b.created - a.created);
+
+  const active = filters.size || favOnly || $('q').value.trim();
+  $('clearFilters').classList.toggle('hide', !active);
+  $('resultInfo').textContent = items.length ? `${list.length} of ${items.length} prompts` : '';
+
+  if (!items.length) {
+    $('list').innerHTML = `<div class="empty">Your vault is empty.<br><br><button class="btn primary" id="goAdd">＋ Add your first prompts</button></div>`;
+    $('goAdd').addEventListener('click', () => showTab('add'));
+    return;
+  }
+  if (!list.length) { $('list').innerHTML = `<div class="empty">No prompts match. Try clearing filters.</div>`; return; }
+
+  $('list').innerHTML = list.map(it => {
+    const t = thumb(it);
+    return `<div class="card" data-id="${it.id}">
+      ${t ? `<img class="thumb" src="${t}" alt="">` : ''}
+      <div class="body">
+        <div class="text">${esc(it.text)}</div>
+        ${it.notes ? `<div class="notes">${esc(it.notes)}</div>` : ''}
+        <div class="chips">${sortCats(it.cats).filter(c => c !== 'Subject:Uncategorized').map(c => chipHTML(c)).join('')}${it.tags.map(x => chipHTML('Tag:' + x)).join('')}</div>
+        <div class="acts">
+          <button class="btn primary copybtn">⧉ Copy</button>
+          <button class="star ${it.fav ? 'on' : ''}" aria-label="Favourite">${it.fav ? '★' : '☆'}</button>
+          <button class="btn icon editBtn" aria-label="Edit">✎</button>
+          <div class="meta">${it.copies ? `Copied ${it.copies}×<br>` : ''}${new Date(it.created).toLocaleDateString()}</div>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+
+  $('list').querySelectorAll('.card').forEach(card => {
+    const it = items.find(i => i.id === card.dataset.id);
+    card.querySelector('.text').addEventListener('click', () => card.classList.toggle('open'));
+    card.querySelector('.copybtn').addEventListener('click', e => copyPrompt(it, e.currentTarget));
+    card.querySelector('.star').addEventListener('click', async () => {
+      it.fav = !it.fav; await dbPut(it); renderLib(); toast(it.fav ? 'Added to favourites ★' : 'Removed from favourites');
+    });
+    card.querySelector('.editBtn').addEventListener('click', () => openEditor(it));
+    const img = card.querySelector('.thumb');
+    if (img) img.addEventListener('click', () => openImage(it));
+  });
+}
+
+async function copyPrompt(it, btn) {
+  let ok = false;
+  try { await navigator.clipboard.writeText(it.text); ok = true; }
+  catch {
+    const ta = document.createElement('textarea'); ta.value = it.text; ta.style.position = 'fixed'; ta.style.opacity = '0';
+    document.body.appendChild(ta); ta.select();
+    try { ok = document.execCommand('copy'); } catch {}
+    ta.remove();
+  }
+  if (!ok) return toast('Copy failed — tap the text to expand and copy manually');
+  it.copies = (it.copies || 0) + 1; it.lastCopied = Date.now();
+  dbPut(it).catch(() => {});
+  btn.textContent = '✓ Copied'; btn.classList.add('done');
+  setTimeout(() => { btn.textContent = '⧉ Copy'; btn.classList.remove('done'); }, 1400);
+  toast('Prompt copied to clipboard');
+}
+
+// ================= MODALS =================
+function modal(html) {
+  const m = document.createElement('div');
+  m.className = 'modal';
+  m.innerHTML = `<div class="sheet">${html}</div>`;
+  m.addEventListener('click', e => { if (e.target === m) close(); });
+  const close = () => m.remove();
+  $('modalRoot').appendChild(m);
+  return { el: m.firstChild, close };
+}
+
+function openImage(it) {
+  const { el, close } = modal(`<img src="${thumb(it)}" style="width:100%;border-radius:12px"><div class="row" style="justify-content:flex-end;margin-top:10px"><button class="btn">Close</button></div>`);
+  el.querySelector('button').addEventListener('click', close);
+}
+
+function openEditor(it) {
+  const draft = { cats: new Set(it.cats), tags: [...it.tags], image: it.image, imgURL: it.image ? thumb(it) : null, removeImg: false };
+  const { el, close } = modal(`
+    <h2>Edit prompt</h2>
+    <textarea id="eText">${esc(it.text)}</textarea>
+    <h3>Notes</h3>
+    <input type="text" id="eNotes" value="${esc(it.notes || '')}" placeholder="e.g. works best with --v 6, used for album art">
+    <div id="eCats"></div>
+    <h3>My tags</h3>
+    <div class="chips" id="eTags"></div>
+    <input type="text" id="eTagIn" placeholder="Add tags (comma separated), press Enter" style="margin-top:6px">
+    <h3>Example image</h3>
+    <div class="row" id="eImgRow"></div>
+    <div class="row" style="margin-top:14px">
+      <button class="btn" id="eSuggest">↻ Re-suggest</button>
+      <button class="btn danger" id="eDel">Delete</button>
+      <span class="grow"></span>
+      <button class="btn" id="eCancel">Cancel</button>
+      <button class="btn teal" id="eSave">Save</button>
+    </div>`);
+
+  const drawCats = () => {
+    const html = [];
+    for (const f of FACETS.filter(f => f !== 'Tag')) {
+      let opts = f === 'Aspect' ? [...new Set(items.flatMap(i => i.cats).filter(c => c.startsWith('Aspect:')).concat([...draft.cats].filter(c => c.startsWith('Aspect:'))))]
+        : Object.keys(RULES[f] || {}).map(v => f + ':' + v);
+      if (f === 'Subject') opts.push('Subject:Uncategorized');
+      if (!opts.length) continue;
+      html.push(`<h3>${FACET_LABEL[f]}</h3><div class="chips">${opts.map(c => chipHTML(c, draft.cats.has(c) ? '' : 'off', 'button')).join('')}</div>`);
+    }
+    el.querySelector('#eCats').innerHTML = html.join('');
+    el.querySelectorAll('#eCats button.chip').forEach(b => b.addEventListener('click', () => {
+      const c = b.dataset.cat; draft.cats.has(c) ? draft.cats.delete(c) : draft.cats.add(c); drawCats();
+    }));
+  };
+  const drawTags = () => {
+    el.querySelector('#eTags').innerHTML = draft.tags.length ? draft.tags.map(t => chipHTML('Tag:' + t, '', 'button')).join('') : '<span class="dim">No tags yet — tap a tag to remove it</span>';
+    el.querySelectorAll('#eTags button.chip').forEach(b => b.addEventListener('click', () => {
+      draft.tags = draft.tags.filter(t => 'Tag:' + t !== b.dataset.cat); drawTags(); toast('Tag removed');
+    }));
+  };
+  const drawImg = () => {
+    const r = el.querySelector('#eImgRow');
+    r.innerHTML = (draft.imgURL ? `<img class="pvimg" src="${draft.imgURL}">` : '<span class="dim">None</span>') +
+      `<button class="btn" id="eImgPick">${draft.imgURL ? 'Replace' : 'Attach'}</button>` +
+      (draft.imgURL ? '<button class="btn danger" id="eImgDel">Remove</button>' : '');
+    r.querySelector('#eImgPick').addEventListener('click', () => pickImage(blob => {
+      draft.image = blob; draft.imgURL = URL.createObjectURL(blob); draft.removeImg = false; drawImg(); toast('Image attached');
+    }));
+    const d = r.querySelector('#eImgDel');
+    if (d) d.addEventListener('click', () => { draft.image = null; draft.imgURL = null; draft.removeImg = true; drawImg(); toast('Image will be removed'); });
+  };
+  drawCats(); drawTags(); drawImg();
+
+  const tin = el.querySelector('#eTagIn');
+  tin.addEventListener('keydown', e => {
+    if (e.key !== 'Enter') return; e.preventDefault();
+    const t = tin.value.split(',').map(s => s.trim()).filter(Boolean);
+    if (!t.length) return;
+    draft.tags = [...new Set([...draft.tags, ...t])]; tin.value = ''; drawTags(); toast('Tag added');
+  });
+  el.querySelector('#eSuggest').addEventListener('click', () => {
+    const before = draft.cats.size;
+    for (const c of suggest(el.querySelector('#eText').value)) draft.cats.add(c);
+    drawCats(); toast(draft.cats.size > before ? `Added ${draft.cats.size - before} suggestion(s)` : 'No new suggestions');
+  });
+  el.querySelector('#eCancel').addEventListener('click', () => { close(); toast('Changes discarded'); });
+  el.querySelector('#eDel').addEventListener('click', async () => {
+    if (!confirm('Delete this prompt permanently?')) return toast('Delete cancelled');
+    await dbDel(it.id); dropThumb(it.id); items = items.filter(i => i.id !== it.id);
+    close(); renderLib(); toast('Prompt deleted');
+  });
+  el.querySelector('#eSave').addEventListener('click', async () => {
+    const text = el.querySelector('#eText').value.trim();
+    if (!text) return toast('Prompt text can’t be empty');
+    const pendingTag = tin.value.split(',').map(s => s.trim()).filter(Boolean);
+    Object.assign(it, {
+      text, title: makeTitle(text), notes: el.querySelector('#eNotes').value.trim(),
+      cats: [...draft.cats], tags: [...new Set([...draft.tags, ...pendingTag])], updated: Date.now()
+    });
+    if (draft.image !== it.image || draft.removeImg) { dropThumb(it.id); it.image = draft.image; }
+    try { await dbPut(it); close(); renderLib(); toast('Saved ✓'); }
+    catch (e) { toast('Save failed: ' + e.message); }
+  });
+}
+
+// ================= MENU: backup / import / tools =================
+$('menuBtn').addEventListener('click', () => {
+  const { el, close } = modal(`
+    <h2>Vault tools</h2>
+    <div class="menu">
+      <button class="btn" id="mExport">⬇ Export backup (.json, includes images)</button>
+      <button class="btn" id="mImport">⬆ Import backup (.json — merges, skips duplicates)</button>
+      <button class="btn" id="mText">📄 Export all prompts as text (.txt)</button>
+      <button class="btn" id="mRecat">↻ Add new suggestions to all prompts</button>
+      <button class="btn danger" id="mWipe">🗑 Delete everything</button>
+    </div>
+    <p class="dim">Your prompts are stored in this browser on this device. Export a backup now and then — clearing site data will erase the vault.</p>
+    <p class="dim" id="mStore"></p>
+    <button class="btn" id="mClose" style="width:100%">Close</button>`);
+  el.querySelector('#mClose').addEventListener('click', close);
+  if (navigator.storage && navigator.storage.estimate) navigator.storage.estimate().then(e => {
+    el.querySelector('#mStore').textContent = `${items.length} prompts · about ${(e.usage / 1e6).toFixed(1)} MB used`;
+  });
+
+  el.querySelector('#mExport').addEventListener('click', async () => {
+    toast('Preparing backup…');
+    const out = [];
+    for (const it of items) out.push({ ...it, image: it.image ? await blobToDataURL(it.image) : null });
+    download(new Blob([JSON.stringify({ app: 'prompt-vault', version: 1, exported: new Date().toISOString(), prompts: out }, null, 1)], { type: 'application/json' }),
+      `prompt-vault-backup-${new Date().toISOString().slice(0, 10)}.json`);
+    toast(`Backup downloaded (${items.length} prompts)`);
+  });
+  el.querySelector('#mImport').addEventListener('click', () => { $('importPick').value = ''; $('importPick').click(); close(); });
+  el.querySelector('#mText').addEventListener('click', () => {
+    const txt = items.slice().sort((a, b) => a.created - b.created).map(i => i.text).join('\n\n');
+    download(new Blob([txt], { type: 'text/plain' }), 'prompt-vault.txt'); toast('Text file downloaded');
+  });
+  el.querySelector('#mRecat').addEventListener('click', async () => {
+    let added = 0;
+    for (const it of items) {
+      const s = new Set(it.cats); const n = s.size;
+      for (const c of suggest(it.text)) s.add(c);
+      if (s.size > n && s.has('Subject:Uncategorized') && [...s].filter(c => c.startsWith('Subject:')).length > 1) s.delete('Subject:Uncategorized');
+      added += Math.max(0, s.size - n); it.cats = [...s];
+    }
+    await dbPut(items); renderLib(); close(); toast(added ? `Added ${added} category suggestion(s)` : 'Everything already up to date');
+  });
+  el.querySelector('#mWipe').addEventListener('click', async () => {
+    const ans = prompt(`Type DELETE to erase all ${items.length} prompts. (Export a backup first!)`);
+    if (ans !== 'DELETE') return toast('Nothing deleted');
+    await dbClear(); [...thumbURLs.keys()].forEach(dropThumb); items = []; filters.clear();
+    close(); renderLib(); toast('Vault erased');
+  });
+});
+
+$('importPick').addEventListener('change', async () => {
+  const f = $('importPick').files[0]; if (!f) return;
+  try {
+    const data = JSON.parse(await f.text());
+    const arr = Array.isArray(data) ? data : data.prompts;
+    if (!Array.isArray(arr)) throw new Error('Not a Prompt Vault backup');
+    const have = new Set(items.map(i => norm(i.text)));
+    const recs = [];
+    for (const p of arr) {
+      if (!p || !p.text || have.has(norm(p.text))) continue;
+      have.add(norm(p.text));
+      recs.push({
+        id: uid(), text: p.text, title: p.title || makeTitle(p.text),
+        cats: Array.isArray(p.cats) ? p.cats : suggest(p.text), tags: Array.isArray(p.tags) ? p.tags : [],
+        notes: p.notes || '', image: p.image ? await dataURLToBlob(p.image) : null,
+        fav: !!p.fav, created: p.created || Date.now(), updated: Date.now(), copies: p.copies || 0, lastCopied: p.lastCopied || 0
+      });
+    }
+    await dbPut(recs); items.push(...recs); renderLib();
+    toast(`Imported ${recs.length} new prompt(s)${arr.length - recs.length ? `, skipped ${arr.length - recs.length} duplicate(s)` : ''}`);
+  } catch (e) { toast('Import failed: ' + e.message); }
+});
+
+// ================= HELPERS =================
+function download(blob, name) {
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name;
+  document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 30000);
+}
+function blobToDataURL(b) { return new Promise(r => { const fr = new FileReader(); fr.onload = () => r(fr.result); fr.readAsDataURL(b); }); }
+async function dataURLToBlob(u) { return (await fetch(u)).blob(); }
+function debounce(fn, ms) { let t; return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), ms); }; }
+
+// ================= INIT =================
+(async () => {
+  try {
+    db = await openDB();
+    items = await dbAll();
+    if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {});
+  } catch (e) {
+    toast('Storage unavailable: ' + e.message);
+  }
+  renderLib();
+})();
+})();
+</script>
+</body>
+</html>

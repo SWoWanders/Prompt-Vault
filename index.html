@@ -243,7 +243,14 @@ function makeTitle(text) {
   const words = clean.split(' ').slice(0, 8).join(' ');
   return words.length < clean.length ? words.replace(/[,.;]+$/, '') + '…' : words;
 }
-const norm = t => t.toLowerCase().replace(/\s+/g, ' ').trim();
+// Duplicate key: ignores case, extra spaces, spacing around punctuation, smart quotes and trailing punctuation
+const norm = t => t.toLowerCase()
+  .replace(/[‘’]/g, "'").replace(/[“”]/g, '"').replace(/[–—]/g, '-')
+  .replace(/\s+/g, ' ')
+  .replace(/\s*([,.;:!?()\[\]{}])\s*/g, '$1')
+  .replace(/[\s,.;:!?]+$/, '')
+  .trim();
+const vaultHas = (text, exceptId) => { const n = norm(text); return items.some(i => i.id !== exceptId && norm(i.text) === n); };
 
 // ================= STORAGE (IndexedDB) =================
 const DB_NAME = 'prompt-vault', STORE = 'prompts';
@@ -277,6 +284,7 @@ const dbClear = () => tx('readwrite', s => { s.clear(); });
 // ================= STATE =================
 let items = [];
 let pending = [];          // prompts being added
+let dupesDropped = [];     // duplicates rejected in the current paste
 const filters = new Set(); // "Facet:Value"
 let favOnly = false;
 const thumbURLs = new Map();
@@ -333,19 +341,26 @@ $('analyze').addEventListener('click', () => {
   const seen = new Set();
   pending = chunks.map(c => c.trim()).filter(Boolean).map(text => {
     const n = norm(text);
-    const dupe = existing.has(n) ? 'Already in your vault' : seen.has(n) ? 'Duplicate in this batch' : '';
+    const dupe = existing.has(n) ? 'already in your vault' : seen.has(n) ? 'pasted twice in this batch' : '';
     seen.add(n);
-    return { id: uid(), text, title: makeTitle(text), cats: suggest(text), off: new Set(), tags: [], notes: '', image: null, dupe, skip: !!dupe };
+    return dupe ? { dupe, text } : { id: uid(), text, title: makeTitle(text), cats: suggest(text), off: new Set(), tags: [], notes: '', image: null, skip: false };
   });
+  // Duplicates are never added — drop them and report
+  dupesDropped = pending.filter(p => p.dupe);
+  pending = pending.filter(p => !p.dupe);
   renderPending();
-  toast(`Found ${pending.length} prompt${pending.length > 1 ? 's' : ''}`);
+  const d = dupesDropped.length, n = pending.length;
+  if (!n) toast(d === 1 ? 'That prompt is already in your vault' : `All ${d} prompts are already in your vault`);
+  else toast(`Found ${n} new prompt${n > 1 ? 's' : ''}${d ? ` · ${d} duplicate${d > 1 ? 's' : ''} removed` : ''}`);
 });
 
 function renderPending() {
   const box = $('preview');
   $('saveRow').classList.toggle('hide', !pending.length);
-  if (!pending.length) { box.innerHTML = ''; return; }
-  box.innerHTML = pending.map((p, i) => `
+  const dupeNote = dupesDropped.length ? `<div class="pv dupe">⚠ Skipped ${dupesDropped.length} duplicate${dupesDropped.length > 1 ? 's' : ''} — won’t be added:
+    ${dupesDropped.map(d => `<div class="dim" style="margin-top:4px">• “${esc(d.text.length > 80 ? d.text.slice(0, 80) + '…' : d.text)}” — ${d.dupe}</div>`).join('')}</div>` : '';
+  if (!pending.length) { box.innerHTML = dupeNote; return; }
+  box.innerHTML = dupeNote + pending.map((p, i) => `
     <div class="pv" data-i="${i}">
       <div class="row" style="align-items:flex-start">
         <div class="grow ptext">${esc(p.text)}</div>
@@ -353,7 +368,6 @@ function renderPending() {
       </div>
       <div class="chips" style="margin-top:8px">${sortCats(p.cats).map(c => chipHTML(c, p.off.has(c) ? 'off' : '', 'button')).join('')}
         ${p.tags.map(t => chipHTML('Tag:' + t, '', 'button')).join('')}</div>
-      ${p.dupe ? `<div class="dupe">⚠ ${p.dupe}</div>` : ''}
       <div class="row" style="margin-top:8px">
         <input type="text" class="grow tagIn" placeholder="Add tags (comma separated)" style="flex:1;min-width:0;font-size:14px;padding:7px 10px">
         <button class="btn icon imgBtn" title="Attach example image">🖼</button>
@@ -361,7 +375,7 @@ function renderPending() {
       </div>
     </div>`).join('');
 
-  box.querySelectorAll('.pv').forEach(el => {
+  box.querySelectorAll('.pv[data-i]').forEach(el => {
     const p = pending[+el.dataset.i];
     el.querySelectorAll('button.chip').forEach(ch => ch.addEventListener('click', () => {
       const c = ch.dataset.cat;
@@ -386,10 +400,15 @@ function renderPending() {
   });
 }
 
-$('cancelAdd').addEventListener('click', () => { pending = []; renderPending(); toast('Discarded'); });
+$('cancelAdd').addEventListener('click', () => { pending = []; dupesDropped = []; renderPending(); toast('Discarded'); });
 $('saveAll').addEventListener('click', async () => {
-  const keep = pending.filter(p => !p.skip);
-  if (!keep.length) return toast('Nothing selected to save');
+  // Final guard: re-check against the vault right before saving
+  const seen = new Set(items.map(i => norm(i.text)));
+  const keep = pending.filter(p => {
+    if (p.skip) return false;
+    const n = norm(p.text); if (seen.has(n)) return false; seen.add(n); return true;
+  });
+  if (!keep.length) return toast('Nothing new to save');
   const now = Date.now();
   const recs = keep.map((p, k) => ({
     id: p.id, text: p.text, title: p.title,
@@ -400,7 +419,7 @@ $('saveAll').addEventListener('click', async () => {
     await dbPut(recs);
     items.push(...recs);
     pending.forEach(p => p._url && URL.revokeObjectURL(p._url));
-    pending = []; $('paste').value = ''; renderPending();
+    pending = []; dupesDropped = []; $('paste').value = ''; renderPending();
     renderLib(); showTab('lib');
     toast(`Saved ${recs.length} prompt${recs.length > 1 ? 's' : ''} ✓`);
   } catch (e) { toast('Save failed: ' + e.message); }
@@ -637,6 +656,7 @@ function openEditor(it) {
   el.querySelector('#eSave').addEventListener('click', async () => {
     const text = el.querySelector('#eText').value.trim();
     if (!text) return toast('Prompt text can’t be empty');
+    if (vaultHas(text, it.id)) return toast('Another prompt in your vault already has this text — not saved');
     const pendingTag = tin.value.split(',').map(s => s.trim()).filter(Boolean);
     Object.assign(it, {
       text, title: makeTitle(text), notes: el.querySelector('#eNotes').value.trim(),
@@ -730,11 +750,34 @@ function blobToDataURL(b) { return new Promise(r => { const fr = new FileReader(
 async function dataURLToBlob(u) { return (await fetch(u)).blob(); }
 function debounce(fn, ms) { let t; return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), ms); }; }
 
+// Merge any duplicates already stored: keep the oldest, fold in tags, categories, favourite, notes, image and copy count
+async function mergeExistingDupes() {
+  const byKey = new Map(), remove = [];
+  for (const it of [...items].sort((a, b) => a.created - b.created)) {
+    const k = norm(it.text), keep = byKey.get(k);
+    if (!keep) { byKey.set(k, it); continue; }
+    keep.tags = [...new Set([...keep.tags, ...it.tags])];
+    keep.cats = [...new Set([...keep.cats, ...it.cats])];
+    keep.fav = keep.fav || it.fav;
+    keep.copies = (keep.copies || 0) + (it.copies || 0);
+    keep.lastCopied = Math.max(keep.lastCopied || 0, it.lastCopied || 0);
+    if (!keep.notes && it.notes) keep.notes = it.notes;
+    if (!keep.image && it.image) keep.image = it.image;
+    remove.push(it);
+  }
+  if (!remove.length) return;
+  await dbPut([...byKey.values()]);
+  for (const r of remove) await dbDel(r.id);
+  items = [...byKey.values()];
+  setTimeout(() => toast(`Merged ${remove.length} duplicate prompt${remove.length > 1 ? 's' : ''}`), 300);
+}
+
 // ================= INIT =================
 (async () => {
   try {
     db = await openDB();
     items = await dbAll();
+    await mergeExistingDupes();
     if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {});
   } catch (e) {
     toast('Storage unavailable: ' + e.message);

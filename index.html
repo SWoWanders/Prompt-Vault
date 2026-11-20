@@ -897,7 +897,7 @@ async function buildPdf(list, opts, progress) {
 
       // Lines for this prompt: [font, size, leading, color, text]
       const L = [];
-      const head = [`#${n}`, it.fav ? 'Favourite' : '', `Added ${new Date(it.created).toLocaleDateString()}`, it.copies ? `Copied ${it.copies}x` : ''].filter(Boolean).join('   ·   ');
+      const head = [`#${n}`, it.fav ? 'Favourite' : '', `Added ${new Date(it.created).toLocaleDateString()}`].filter(Boolean).join('   ·   ');
       L.push(['B', 8, 13, '#999999', pdfSafe(head)]);
       for (const ln of wrap(it.text, 'R', 10.5, tw)) L.push(['R', 10.5, 14, '#1a1a1a', ln]);
       if (opts.meta) {

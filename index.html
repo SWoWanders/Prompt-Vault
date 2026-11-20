@@ -493,18 +493,23 @@ function renderFilters() {
   }));
 }
 
+// The library's current search + filters + sort order
+function currentList(all = false) {
+  const s = $('sort').value;
+  return items.filter(it => all || matches(it)).sort((a, b) =>
+    s === 'old' ? a.created - b.created :
+    s === 'copies' ? b.copies - a.copies || b.created - a.created :
+    s === 'used' ? (b.lastCopied || 0) - (a.lastCopied || 0) :
+    s === 'az' ? a.text.localeCompare(b.text) : b.created - a.created);
+}
+
 function renderLib() {
   $('libCount').textContent = items.length ? `(${items.length})` : '';
   renderFilters();
   if (!$('filters').classList.contains('hide')) $('filterToggle').textContent = 'Filters ▴';
   else $('filterToggle').textContent = `Filters${filters.size ? ' (' + filters.size + ')' : ''} ▾`;
 
-  const s = $('sort').value;
-  const list = items.filter(it => matches(it)).sort((a, b) =>
-    s === 'old' ? a.created - b.created :
-    s === 'copies' ? b.copies - a.copies || b.created - a.created :
-    s === 'used' ? (b.lastCopied || 0) - (a.lastCopied || 0) :
-    s === 'az' ? a.text.localeCompare(b.text) : b.created - a.created);
+  const list = currentList();
 
   const active = filters.size || favOnly || $('q').value.trim();
   $('clearFilters').classList.toggle('hide', !active);
@@ -675,6 +680,7 @@ $('menuBtn').addEventListener('click', () => {
     <div class="menu">
       <button class="btn" id="mExport">⬇ Export backup (.json, includes images)</button>
       <button class="btn" id="mImport">⬆ Import backup (.json — merges, skips duplicates)</button>
+      <button class="btn" id="mPdf">📑 Export as PDF (with example images)</button>
       <button class="btn" id="mText">📄 Export all prompts as text (.txt)</button>
       <button class="btn" id="mRecat">↻ Add new suggestions to all prompts</button>
       <button class="btn danger" id="mWipe">🗑 Delete everything</button>
@@ -696,6 +702,7 @@ $('menuBtn').addEventListener('click', () => {
     toast(`Backup downloaded (${items.length} prompts)`);
   });
   el.querySelector('#mImport').addEventListener('click', () => { $('importPick').value = ''; $('importPick').click(); close(); });
+  el.querySelector('#mPdf').addEventListener('click', () => { close(); openPdfDialog(); });
   el.querySelector('#mText').addEventListener('click', () => {
     const txt = items.slice().sort((a, b) => a.created - b.created).map(i => i.text).join('\n\n');
     download(new Blob([txt], { type: 'text/plain' }), 'prompt-vault.txt'); toast('Text file downloaded');
@@ -740,6 +747,231 @@ $('importPick').addEventListener('change', async () => {
     toast(`Imported ${recs.length} new prompt(s)${arr.length - recs.length ? `, skipped ${arr.length - recs.length} duplicate(s)` : ''}`);
   } catch (e) { toast('Import failed: ' + e.message); }
 });
+
+// ================= PDF EXPORT (built-in writer — no libraries, no services) =================
+function openPdfDialog() {
+  if (!items.length) return toast('Your vault is empty — nothing to export');
+  const view = currentList();
+  const withImg = items.filter(i => i.image).length;
+  const { el, close } = modal(`
+    <h2>Export as PDF</h2>
+    <h3>Which prompts</h3>
+    <label class="chk"><input type="radio" name="pScope" value="all" checked> All prompts (${items.length})</label>
+    <label class="chk" style="margin-top:6px"><input type="radio" name="pScope" value="view" ${view.length === items.length ? 'disabled' : ''}> Only what’s showing now — current search &amp; filters (${view.length})</label>
+    <h3>Order</h3>
+    <label class="chk"><input type="radio" name="pOrder" value="group" checked> Grouped by subject, with headings</label>
+    <label class="chk" style="margin-top:6px"><input type="radio" name="pOrder" value="sort"> Same order as the library</label>
+    <h3>Options</h3>
+    <label class="chk"><input type="checkbox" id="pImg" checked> Include example images (${withImg} prompt${withImg === 1 ? ' has' : 's have'} one)</label>
+    <label class="chk" style="margin-top:6px"><input type="checkbox" id="pMeta" checked> Include categories, tags &amp; notes</label>
+    <h3>Paper size</h3>
+    <select id="pPaper"><option value="letter">Letter (8.5 × 11 in)</option><option value="a4">A4</option></select>
+    <div class="row" style="margin-top:16px;justify-content:flex-end">
+      <button class="btn" id="pCancel">Cancel</button>
+      <button class="btn teal" id="pGo">Create PDF</button>
+    </div>`);
+  el.querySelector('#pCancel').addEventListener('click', () => { close(); toast('PDF export cancelled'); });
+  el.querySelector('#pGo').addEventListener('click', async () => {
+    const scope = el.querySelector('input[name=pScope]:checked').value;
+    const opts = {
+      group: el.querySelector('input[name=pOrder]:checked').value === 'group',
+      images: el.querySelector('#pImg').checked,
+      meta: el.querySelector('#pMeta').checked,
+      paper: el.querySelector('#pPaper').value
+    };
+    const list = scope === 'view' ? view : currentList(true);
+    const btn = el.querySelector('#pGo'); btn.disabled = true; btn.textContent = 'Creating…';
+    try {
+      const blob = await buildPdf(list, opts, (i, n) => { btn.textContent = `Creating… ${i}/${n}`; });
+      download(blob, `prompt-vault-${new Date().toISOString().slice(0, 10)}.pdf`);
+      close(); toast(`PDF downloaded — ${list.length} prompt${list.length === 1 ? '' : 's'} (${(blob.size / 1e6).toFixed(1)} MB)`);
+    } catch (e) {
+      btn.disabled = false; btn.textContent = 'Create PDF'; toast('PDF failed: ' + e.message);
+    }
+  });
+}
+
+// Characters the PDF's built-in Helvetica can show (WinAnsi). Emoji/other scripts are dropped quietly.
+const WIN_EXTRA = { '€':0x80,'‚':0x82,'ƒ':0x83,'„':0x84,'…':0x85,'†':0x86,'‡':0x87,'ˆ':0x88,'‰':0x89,'Š':0x8A,'‹':0x8B,'Œ':0x8C,'Ž':0x8E,
+  '‘':0x91,'’':0x92,'“':0x93,'”':0x94,'•':0x95,'–':0x96,'—':0x97,'˜':0x98,'™':0x99,'š':0x9A,'›':0x9B,'œ':0x9C,'ž':0x9E,'Ÿ':0x9F };
+function pdfSafe(s) {
+  let out = '';
+  for (const ch of String(s).replace(/\t/g, '    ')) {
+    const c = ch.codePointAt(0);
+    out += (c >= 32 && c < 127) || (c >= 160 && c <= 255) || WIN_EXTRA[ch] ? ch : (c === 10 ? '\n' : '');
+  }
+  return out.replace(/ {2,}/g, ' ');
+}
+function pdfHex(s) {
+  let h = '<';
+  for (const ch of s) { const c = WIN_EXTRA[ch] || ch.codePointAt(0); h += c.toString(16).padStart(2, '0'); }
+  return h + '>';
+}
+
+async function buildPdf(list, opts, progress) {
+  const [PW, PH] = opts.paper === 'a4' ? [595.28, 841.89] : [612, 792];
+  const M = 50, CW = PW - M * 2, TOP = M, BOTTOM = PH - M - 16;
+  const IMG = 150, GAP = 14;
+  const FONT = { R: '/F1', B: '/F2', I: '/F3' };
+  const measureCtx = document.createElement('canvas').getContext('2d');
+  const CSS = { R: '', B: 'bold ', I: 'italic ' };
+  const width = (t, f, size) => { measureCtx.font = `${CSS[f]}${size}px Helvetica, Arial, "Liberation Sans", sans-serif`; return measureCtx.measureText(t).width; };
+
+  function wrap(text, f, size, maxW) {
+    maxW *= 0.95; // safety margin for font-metric differences between phone fonts and Helvetica
+    const out = [];
+    for (const para of pdfSafe(text).split('\n')) {
+      const words = para.split(' ');
+      let line = '';
+      for (let w of words) {
+        while (width(w, f, size) > maxW) { // break very long words
+          let k = w.length; while (k > 1 && width(w.slice(0, k), f, size) > maxW) k--;
+          if (line) { out.push(line); line = ''; }
+          out.push(w.slice(0, k)); w = w.slice(k);
+        }
+        const test = line ? line + ' ' + w : w;
+        if (width(test, f, size) <= maxW) line = test; else { out.push(line); line = w; }
+      }
+      out.push(line);
+    }
+    return out;
+  }
+
+  // ---- images: re-encode every example image as a baseline RGB JPEG the PDF can embed directly
+  const images = new Map();
+  if (opts.images) {
+    let k = 0;
+    for (const it of list) {
+      if (!it.image) continue;
+      try {
+        const bmp = await createImageBitmap(it.image);
+        const sc = Math.min(1, 800 / Math.max(bmp.width, bmp.height));
+        const c = document.createElement('canvas');
+        c.width = Math.max(1, Math.round(bmp.width * sc)); c.height = Math.max(1, Math.round(bmp.height * sc));
+        const g = c.getContext('2d'); g.fillStyle = '#fff'; g.fillRect(0, 0, c.width, c.height); g.drawImage(bmp, 0, 0, c.width, c.height);
+        const jb = await new Promise(r => c.toBlob(r, 'image/jpeg', .85));
+        images.set(it.id, { name: '/Im' + (++k), w: c.width, h: c.height, bytes: new Uint8Array(await jb.arrayBuffer()) });
+      } catch { /* unreadable image — skip it, keep the prompt */ }
+    }
+  }
+
+  // ---- layout
+  const pages = []; let ops, y;
+  const col = hex => { const n = parseInt(hex.slice(1), 16); return `${((n >> 16) / 255).toFixed(3)} ${((n >> 8 & 255) / 255).toFixed(3)} ${((n & 255) / 255).toFixed(3)} rg`; };
+  const text = (s, x, yTop, f, size, color) => ops.push(`BT ${FONT[f]} ${size} Tf ${col(color)} 1 0 0 1 ${x.toFixed(2)} ${(PH - yTop - size).toFixed(2)} Tm ${pdfHex(s)} Tj ET`);
+  const rule = (yTop, color = '#dddddd') => ops.push(`${col(color).replace('rg', 'RG')} 0.6 w ${M} ${(PH - yTop).toFixed(2)} m ${M + CW} ${(PH - yTop).toFixed(2)} l S`);
+  const newPage = () => { ops = []; pages.push(ops); y = TOP; };
+  newPage();
+
+  // Cover header
+  text('Prompt Vault', M, y, 'B', 24, '#5b2a9e'); y += 32;
+  text(pdfSafe(`${list.length} prompt${list.length === 1 ? '' : 's'} · exported ${new Date().toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' })}`), M, y, 'R', 10, '#777777'); y += 22;
+  rule(y, '#5b2a9e'); y += 16;
+
+  // Build sections
+  let sections;
+  if (opts.group) {
+    const order = [...Object.keys(RULES.Subject), 'Uncategorized'];
+    const buckets = new Map(order.map(s => [s, []]));
+    for (const it of list) {
+      const subs = it.cats.filter(c => c.startsWith('Subject:')).map(c => splitCat(c)[1]);
+      const first = order.find(s => subs.includes(s)) || 'Uncategorized'; // each prompt appears once only
+      buckets.get(first).push(it);
+    }
+    sections = order.filter(s => buckets.get(s).length).map(s => ({ title: s, items: buckets.get(s) }));
+  } else sections = [{ title: null, items: list }];
+
+  let n = 0;
+  const total = list.length;
+  for (const sec of sections) {
+    if (sec.title) {
+      if (y + 30 + 80 > BOTTOM) newPage();   // keep heading with at least one prompt
+      text(pdfSafe(sec.title) + `  (${sec.items.length})`, M, y, 'B', 15, '#5b2a9e'); y += 24;
+    }
+    for (const it of sec.items) {
+      n++; if (n % 10 === 0) { progress(n, total); await new Promise(r => setTimeout(r)); }
+      const img = images.get(it.id);
+      let iw = 0, ih = 0;
+      if (img) { const s = Math.min(IMG / img.w, IMG / img.h); iw = img.w * s; ih = img.h * s; }
+      const tx = M + (img ? IMG + GAP : 0), tw = CW - (img ? IMG + GAP : 0);
+
+      // Lines for this prompt: [font, size, leading, color, text]
+      const L = [];
+      const head = [`#${n}`, it.fav ? 'Favourite' : '', `Added ${new Date(it.created).toLocaleDateString()}`, it.copies ? `Copied ${it.copies}x` : ''].filter(Boolean).join('   ·   ');
+      L.push(['B', 8, 13, '#999999', pdfSafe(head)]);
+      for (const ln of wrap(it.text, 'R', 10.5, tw)) L.push(['R', 10.5, 14, '#1a1a1a', ln]);
+      if (opts.meta) {
+        const byF = {};
+        for (const c of sortCats(it.cats)) { const [f, v] = splitCat(c); if (v === 'Uncategorized') continue; (byF[f] ||= []).push(v); }
+        const catLine = Object.entries(byF).map(([f, v]) => `${FACET_LABEL[f]}: ${v.join(', ')}`).join('   |   ');
+        if (catLine) { L.push(null); for (const ln of wrap(catLine, 'R', 8.5, tw)) L.push(['R', 8.5, 11.5, '#6a5a85', ln]); }
+        if (it.tags.length) for (const ln of wrap('Tags: ' + it.tags.join(', '), 'B', 8.5, tw)) L.push(['B', 8.5, 11.5, '#6a5a85', ln]);
+        if (it.notes) for (const ln of wrap('Note: ' + it.notes, 'I', 9, tw)) L.push(['I', 9, 12.5, '#555555', ln]);
+      }
+      const textH = L.reduce((a, l) => a + (l ? l[2] : 5), 0);
+      const blockH = Math.max(ih, textH) + 18;
+
+      // Start a new page if the block won't fit (unless it's taller than a whole page — then it flows)
+      if (y + blockH > BOTTOM && y > TOP + 60 && blockH <= BOTTOM - TOP) newPage();
+      if (img && y + ih > BOTTOM) newPage();
+
+      const startPage = ops;
+      if (img) ops.push(`q ${iw.toFixed(2)} 0 0 ${ih.toFixed(2)} ${M} ${(PH - y - ih).toFixed(2)} cm ${img.name} Do Q`);
+      let ly = y; const imgBottom = img ? y + ih : y;
+      for (const l of L) {
+        if (!l) { ly += 5; continue; }
+        if (ly + l[2] > BOTTOM) { newPage(); ly = y; }
+        text(l[4], tx, ly, l[0], l[1], l[3]);
+        ly += l[2];
+      }
+      y = (ops === startPage ? Math.max(ly, imgBottom) : ly) + 9;
+      if (y + 9 < BOTTOM) { rule(y); y += 12; }
+    }
+  }
+
+  // Footers
+  pages.forEach((p, i) => {
+    ops = p;
+    const f = pdfSafe(`Prompt Vault  ·  page ${i + 1} of ${pages.length}`);
+    text(f, PW - M - width(f, 'R', 8), PH - M + 4, 'R', 8, '#aaaaaa');
+  });
+
+  // ---- assemble PDF bytes
+  const enc = new TextEncoder();
+  const chunks = []; let offset = 0; const offsets = [];
+  const push = b => { const u = typeof b === 'string' ? enc.encode(b) : b; chunks.push(u); offset += u.length; };
+  const imgList = [...images.values()];
+  const FIRST_IMG = 6, FIRST_PAGE = FIRST_IMG + imgList.length;
+  const objCount = FIRST_PAGE - 1 + pages.length * 2;
+  const obj = (id, body) => { offsets[id] = offset; push(`${id} 0 obj\n`); for (const b of [].concat(body)) push(b); push('\nendobj\n'); };
+
+  push(new Uint8Array([37, 80, 68, 70, 45, 49, 46, 52, 10, 37, 226, 227, 207, 211, 10])); // %PDF-1.4 + binary marker
+  obj(1, `<< /Type /Catalog /Pages 2 0 R >>`);
+  const kids = pages.map((_, i) => `${FIRST_PAGE + i * 2} 0 R`).join(' ');
+  obj(2, `<< /Type /Pages /Kids [${kids}] /Count ${pages.length} >>`);
+  obj(3, `<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>`);
+  obj(4, `<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >>`);
+  obj(5, `<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Oblique /Encoding /WinAnsiEncoding >>`);
+  imgList.forEach((im, i) => obj(FIRST_IMG + i, [
+    `<< /Type /XObject /Subtype /Image /Width ${im.w} /Height ${im.h} /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ${im.bytes.length} >>\nstream\n`,
+    im.bytes, '\nendstream']));
+  const xobjs = imgList.length ? `/XObject << ${imgList.map((im, i) => `${im.name} ${FIRST_IMG + i} 0 R`).join(' ')} >>` : '';
+  pages.forEach((p, i) => {
+    const pid = FIRST_PAGE + i * 2, cid = pid + 1;
+    const stream = enc.encode(p.join('\n'));
+    obj(pid, `<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${PW} ${PH}] /Resources << /Font << /F1 3 0 R /F2 4 0 R /F3 5 0 R >> ${xobjs} >> /Contents ${cid} 0 R >>`);
+    obj(cid, [`<< /Length ${stream.length} >>\nstream\n`, stream, '\nendstream']);
+  });
+  const infoId = objCount + 1;
+  obj(infoId, `<< /Title ${pdfHex('Prompt Vault')} /Producer ${pdfHex('Prompt Vault')} >>`);
+
+  const xref = offset;
+  let x = `xref\n0 ${infoId + 1}\n0000000000 65535 f \n`;
+  for (let i = 1; i <= infoId; i++) x += String(offsets[i]).padStart(10, '0') + ' 00000 n \n';
+  push(x + `trailer\n<< /Size ${infoId + 1} /Root 1 0 R /Info ${infoId} 0 R >>\nstartxref\n${xref}\n%%EOF\n`);
+  progress(total, total);
+  return new Blob(chunks, { type: 'application/pdf' });
+}
 
 // ================= HELPERS =================
 function download(blob, name) {
